@@ -1,0 +1,62 @@
+plugins {
+	id "java-gradle-plugin"
+	id "groovy"
+}
+
+group = "agency.highlysuspect.installertoolsruntime"
+version = "0.1-SNAPSHOT"
+
+repositories {
+	mavenCentral()
+	
+	maven {
+		url "https://maven.neoforged.net/releases"
+		content {
+			includeGroup "net.neoforged"
+		}
+	}
+}
+
+dependencies {
+	compileOnly "net.neoforged:neoforge:21.5.75:installer"
+}
+
+// handy resource
+// https://dev.to/autonomousapps/gradle-all-the-way-down-testing-your-gradle-plugin-with-gradle-testkit-2hmc
+
+// this is from
+// https://docs.gradle.org/current/userguide/jvm_test_suite_plugin.html
+testing {
+	suites {
+		//plain unit testing
+//		test {
+//			useJUnitJupiter()
+//		}
+		
+		//end-to-end-testing
+		functionalTest(JvmTestSuite) {
+			useSpock()
+			dependencies {
+				//it looks like in gradle 8 you need parens here now?
+				//they weren't here in the dev.to article at least.
+				implementation project()
+			}
+		}
+	}
+}
+
+tasks.named("check") {
+	it.dependsOn(tasks.named("functionalTest"))
+}
+
+gradlePlugin {
+	plugins {
+		installertoolsruntime {
+			id = "agency.highlysuspect.installertoolsruntime"
+			implementationClass = "agency.highlysuspect.installertoolsruntime.ITRTPlugin"
+		}
+	}
+	
+	//i thiiiink this is what sets up gradle testkit?
+	testSourceSets(sourceSets.functionalTest)
+}
