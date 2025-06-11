@@ -2,6 +2,7 @@ package agency.highlysuspect.installertoolsruntime.bastion;
 
 import java.io.File;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
 
@@ -20,6 +21,7 @@ public class LookingGlass {
 	
 	//installer -> plugin
 	public File clientPatched, serverPatched, clientExtra, serverExtra, nfUniversal;
+	public List<File> libs;
 	
 	//For inter-classloader communication...
 	public Map<String, Object> toMap() {
@@ -32,6 +34,7 @@ public class LookingGlass {
 		map.put("clientExtra", clientExtra);
 		map.put("serverExtra", serverExtra);
 		map.put("nfUniversal", nfUniversal);
+		map.put("libs", libs);
 		map.put("lifecycle", lifecycle);
 		map.put("info", info);
 		
@@ -49,6 +52,7 @@ public class LookingGlass {
 		glass.clientExtra = (File) map.get("clientExtra");
 		glass.serverExtra = (File) map.get("serverExtra");
 		glass.nfUniversal = (File) map.get("nfUniversal");
+		glass.libs = (List<File>) map.get("libs");
 		glass.lifecycle = (BiConsumer<String, Object[]>) map.get("lifecycle");
 		glass.info = (BiConsumer<String, Object[]>) map.get("info");
 		return glass;

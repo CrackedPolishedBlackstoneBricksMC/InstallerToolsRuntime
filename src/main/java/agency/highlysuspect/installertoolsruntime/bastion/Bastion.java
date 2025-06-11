@@ -20,12 +20,10 @@ import java.util.Map;
 import java.util.Set;
 
 public class Bastion {
-	Class<?> actionClass;
-	
 	{
 		System.out.println("Bastion clinit, I was loaded by " + this.getClass().getClassLoader());
 		try {
-			actionClass = Class.forName("net.minecraftforge.installer.actions.Action");
+			Class.forName("net.minecraftforge.installer.actions.Action");
 		} catch (ClassNotFoundException e) {
 			throw new RuntimeException("Bastion loaded without net.minecraftforge.installer.actions.Action", e);
 		}
@@ -46,54 +44,50 @@ public class Bastion {
 		Version vanilla = getVanillaManifest(monitor, installManifest, glass.rootDir);
 		
 		//find where to put the client and server - use the root dir as scratch space?
-		//this weird path-munging is used in the ServerInstall action. todo is it needed
-//		File clientTarget = new File(versionVanilla, mc + ".jar");
-//		Map<String, String> tokens = Map.of(
-//			"ROOT", glass.rootDir.getAbsolutePath(),
-//			"MINECRAFT_VERSION", mc,
-//			"LIBRARY_DIR", glass.librariesDir.getAbsolutePath()
-//		);
-//		File serverTarget = new File(Util.replaceTokens(tokens, installManifest.getServerJarPath()));
 		File clientTarget = new File(glass.rootDir, mc + ".client.jar");
-		File serverTarget = new File(glass.rootDir, mc + ".server.jar");
+//		File serverTarget = new File(glass.rootDir, mc + ".server.jar");
 		
 		monitor.setCurrentStep("Downloading " + mc + " client to " + clientTarget);
 		download(monitor, installManifest, vanilla, true, clientTarget);
-		monitor.setCurrentStep("Downloading " + mc + " server to " + serverTarget);
-		download(monitor, installManifest, vanilla, false, serverTarget);
+//		monitor.setCurrentStep("Downloading " + mc + " server to " + serverTarget);
+//		download(monitor, installManifest, vanilla, false, serverTarget);
 		
 		//postprocessor creation
 		monitor.setCurrentStep("Creating postprocessors");
 		PostProcessors clientPostProcessors = new PostProcessors(installManifest, true, monitor);
-		PostProcessors serverPostProcessors = new PostProcessors(installManifest, false, monitor);
+//		PostProcessors serverPostProcessors = new PostProcessors(installManifest, false, monitor);
 		
 		//libs
 		monitor.setCurrentStep("Downloading libraries");
-		Set<Version.Library> resolvedLibraries = fetchLibraries(monitor, glass.librariesDir, vanilla, clientPostProcessors, serverPostProcessors);
+		Set<Version.Library> resolvedLibraries = fetchLibraries(monitor, glass.librariesDir, vanilla, clientPostProcessors);
+//		Set<Version.Library> resolvedLibraries = fetchLibraries(monitor, glass.librariesDir, vanilla, clientPostProcessors, serverPostProcessors);
 		
 		//running those processors
 		monitor.setCurrentStep("Running client processors");
 		clientPostProcessors.process(glass.librariesDir, clientTarget, glass.rootDir, glass.neoforgeInstaller);
-		monitor.setCurrentStep("Running server processors");
-		serverPostProcessors.process(glass.librariesDir, serverTarget, glass.rootDir, glass.neoforgeInstaller);
+//		monitor.setCurrentStep("Running server processors");
+//		serverPostProcessors.process(glass.librariesDir, serverTarget, glass.rootDir, glass.neoforgeInstaller);
 		
 		monitor.setCurrentStep("Finishing up");
 		
 		//TODO: a more reliable way to find the patched jar? lol.
 		Map<String, String> clientData = getData(clientPostProcessors);
-		Map<String, String> serverData = getData(serverPostProcessors);
+//		Map<String, String> serverData = getData(serverPostProcessors);
 		glass.clientPatched = new File(clientData.get("PATCHED"));
-		glass.serverPatched = new File(serverData.get("PATCHED"));
+//		glass.serverPatched = new File(serverData.get("PATCHED"));
 		glass.clientExtra = new File(clientData.get("MC_EXTRA"));
-		glass.serverExtra = new File(serverData.get("MC_EXTRA"));
+//		glass.serverExtra = new File(serverData.get("MC_EXTRA"));
 		
-		//yeah this is grody
-		//i feel like parsing the JVM arguments provided by the installer is somehow a *less* bad idea
-		//(later) no it's not, there's just a bunch of wrapper jars
+		glass.libs = new ArrayList<>();
 		for(Version.Library lib : resolvedLibraries) {
+			//yeah this is grody
+			//i feel like parsing the JVM arguments provided by the installer is somehow a *less* bad idea
+			//(later) no it's not, there's just a bunch of wrapper jars
 			Artifact artifact = lib.getName();
 			if("net.neoforged".equals(artifact.getDomain()) && "universal".equals(getClassifier(artifact))) {
 				glass.nfUniversal = lib.getName().getLocalPath(glass.librariesDir);
+			} else {
+				glass.libs.add(artifact.getLocalPath(glass.librariesDir));
 			}
 		}
 		
@@ -129,12 +123,11 @@ public class Bastion {
 		}
 	}
 	
-	public Set<Version.Library> fetchLibraries(ProgressCallback monitor, File librariesDir, Version vanilla, PostProcessors clientPostProcessors, PostProcessors serverPostProcessors) {
+	public Set<Version.Library> fetchLibraries(ProgressCallback monitor, File librariesDir, Version vanilla, PostProcessors... otherPostprocessors) {
 		//see Action#downloadLibraries
 		Set<Version.Library> libraries = new LinkedHashSet<>();
 		libraries.addAll(Arrays.asList(vanilla.getLibraries()));
-		libraries.addAll(Arrays.asList(clientPostProcessors.getLibraries()));
-		libraries.addAll(Arrays.asList(serverPostProcessors.getLibraries()));
+		for(PostProcessors pp : otherPostprocessors) libraries.addAll(Arrays.asList(pp.getLibraries()));
 		
 		//args for the downloader
 		List<Artifact> grabbed = new ArrayList<>();

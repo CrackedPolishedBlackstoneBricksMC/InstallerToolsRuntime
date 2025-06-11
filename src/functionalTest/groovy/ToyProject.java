@@ -22,16 +22,17 @@ public class ToyProject implements AutoCloseable {
 			Files.createDirectories(projectDir);
 			
 			String prefix = """
-				plugins {
-					id "agency.highlysuspect.installertoolsruntime"
-				}
+			plugins {
+				id "java"
+				id "agency.highlysuspect.installertoolsruntime"
+			}
 			
-				repositories {
-					mavenCentral()
-					maven {
-						url "https://maven.neoforged.net/releases"
-					}
+			repositories {
+				mavenCentral()
+				maven {
+					url "https://maven.neoforged.net/releases"
 				}
+			}
 			""".stripIndent();
 			Files.writeString(buildGradle, prefix, StandardCharsets.UTF_8);
 		} catch (IOException e) {

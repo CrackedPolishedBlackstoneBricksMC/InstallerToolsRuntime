@@ -29,9 +29,6 @@ class HelloWorldTest extends Specification {
 		def result = toy.makeGradleRunner().build()
 		
 		then:
-		result.output.contains("Got Neoforge Universal:")
-		result.output.contains("Got Client Patched:")
-		!result.output.contains("Got NeoForge Universal: null")
-		!result.output.contains("Got Client Patched: null")
+		result.output.contains("Adding client at")
 	}
 }

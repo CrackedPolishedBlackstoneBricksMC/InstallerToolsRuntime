@@ -16,6 +16,10 @@ I'm using this to experiment, but when [toybox](https://github.com/CrackedPolish
 
 It's able to run the one (1) version of the NeoForge installer that I've tried.
 
-* The results simply litter your `~/.m2/repository`; it doesn't put the results on the compilation classpath yet.
-* There is no caching, so you rerun the installer every time you invoke gradle.
-* I also need to include a jar merger to zip the client and server together. (Which is part of why I want to bring this code into Toybox, because the jar merger should live in there.)
+Might actually work in a larger project ?? I've done some automated testing but no "does it feel right" testing
+
+### notes to self
+
+* neo seems to patch in all the client-only classes on the server (!) so a jar merger is not necessary. I can just use the client jar
+* after running the installer i should produce a "bill of materials", simply one filepath per line, listing paths to the client jar, neoforge universal, and all the dependent libraries
+* at configure time i check for existence of this file, if it exists i feed its contents to `project.files()`, if it doesn't i run the installer and save the bom there
