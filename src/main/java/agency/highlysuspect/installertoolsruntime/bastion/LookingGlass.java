@@ -16,7 +16,7 @@ public class LookingGlass {
 	public File neoforgeInstaller;
 	public File librariesDir;
 	public File rootDir;
-	public BiConsumer<String, Object[]> lifecycle;
+	public BiConsumer<String, Object[]> lifecycle; //logging facade
 	public BiConsumer<String, Object[]> info;
 	
 	//installer -> plugin
@@ -29,14 +29,14 @@ public class LookingGlass {
 		map.put("neoforgeInstaller", neoforgeInstaller);
 		map.put("librariesDir", librariesDir);
 		map.put("rootDir", rootDir);
+		map.put("lifecycle", lifecycle);
+		map.put("info", info);
 		map.put("clientPatched", clientPatched);
 		map.put("serverPatched", serverPatched);
 		map.put("clientExtra", clientExtra);
 		map.put("serverExtra", serverExtra);
 		map.put("nfUniversal", nfUniversal);
 		map.put("libs", libs);
-		map.put("lifecycle", lifecycle);
-		map.put("info", info);
 		
 		return map;
 	}
@@ -47,14 +47,14 @@ public class LookingGlass {
 		glass.neoforgeInstaller = (File) map.get("neoforgeInstaller");
 		glass.librariesDir = (File) map.get("librariesDir");
 		glass.rootDir = (File) map.get("rootDir");
+		glass.lifecycle = (BiConsumer<String, Object[]>) map.get("lifecycle");
+		glass.info = (BiConsumer<String, Object[]>) map.get("info");
 		glass.clientPatched = (File) map.get("clientPatched");
 		glass.serverPatched = (File) map.get("serverPatched");
 		glass.clientExtra = (File) map.get("clientExtra");
 		glass.serverExtra = (File) map.get("serverExtra");
 		glass.nfUniversal = (File) map.get("nfUniversal");
 		glass.libs = (List<File>) map.get("libs");
-		glass.lifecycle = (BiConsumer<String, Object[]>) map.get("lifecycle");
-		glass.info = (BiConsumer<String, Object[]>) map.get("info");
 		return glass;
 	}
 	

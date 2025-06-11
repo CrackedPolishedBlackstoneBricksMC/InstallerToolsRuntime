@@ -100,28 +100,39 @@ public class ITRTPlugin implements Plugin<Project> {
 		}
 	}
 	
+	//a global cache in your ~/.gradle/caches which every minecraft plugin seems to litter
+	//always good to share work between projects by using a global cache imo
+	//todo i might need a lock file? lol
 	private Path itrtGlobalCache(Project project) {
 		return project.getGradle().getGradleUserHomeDir().toPath()
 			.resolve("caches")
 			.resolve("installertoolsruntime");
 	}
 	
+	//the neoforge installer downloads libraries to a maven-style file tree, and also uses it
+	//for scratch space occasionally if a library already exists in the libs dir, the installer
+	//will avoid downloading it again, but this isn't true for files which are created during
+	//the postprocessors phase
 	private File getLibrariesDir(Project project, ResolvedArtifactResult neoDep) {
-//		String home = System.getProperty("user.home");
-//		if(home == null) throw new RuntimeException("user.home didn't have a value? Not sure where ~/.m2/repository is then?");
-//		return mkdirs(Paths.get(home, ".m2", "repository")).toFile();
 		//TODO: config option to make it a local location instead (mainly for testing purposes)
 		return mkdirs(itrtGlobalCache(project).resolve("libs")).toFile();
 	}
 	
+	//directory that the installer thinks it's installing the game into
+	//normally this would be like, your vanilla launcher .minecraft, or the server dir
+	//also used as a little bit of scratch space, mostly by the server installer, and also
+	//by me since i need somewhere to stick the vanilla minecraft jar
+	//TODO i should probably put the vanilla jar in the libraries folder actually
 	private File getRootDir(Project project, ResolvedArtifactResult neoDep) {
 		String friendlyName = friendlyName(neoDep);
 		
-		//install neoforge to a global location
 		//TODO: config option to make it a local location instead (mainly for testing purposes)
 		return mkdirs(itrtGlobalCache(project).resolve("work").resolve(friendlyName)).toFile();
 	}
 	
+	//location of the "installer bill of materials" for a given installer artifact
+	//this item serves as proof that the installer completed successfully, and also lists out
+	//all the minecraft artifacts and libraries prepared by the installer
 	private File getInstallerBomLocation(Project project, ResolvedArtifactResult neoDep) {
 		return new File(getRootDir(project, neoDep), "bom.txt");
 	}
