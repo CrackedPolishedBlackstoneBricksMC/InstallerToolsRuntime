@@ -68,9 +68,7 @@ public class InstallerRunner {
 		log.lifecycle("Got Server Patched: " + glass.serverPatched);
 		log.lifecycle("Got Client Extra: " + glass.clientExtra);
 		log.lifecycle("Got Server Extra: " + glass.serverExtra);
-		for(File lib : glass.libs) {
-			log.lifecycle("Got Library: " + lib);
-		}
+		for(File lib : glass.libs) log.lifecycle("Got Library: " + lib);
 		
 		//produce bom
 		InstallerBom bom = new InstallerBom();

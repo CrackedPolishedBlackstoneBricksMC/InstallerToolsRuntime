@@ -75,10 +75,19 @@ public class ITRTPlugin implements Plugin<Project> {
 			}
 			
 			File client = bom.client;
-			if(!client.exists()) throw new IllegalStateException("Can't find client at " + client + ", bom outdated?");
+			File universal = bom.universal;
+			if(!client.exists()) throw new IllegalStateException("Can't find client at " + client);
+			if(!universal.exists()) throw new IllegalStateException("Can't find universal at " + universal);
 			
+			//TODO lazy 2am coding
 			log.info("Adding client at {} to project", client);
 			project.getDependencies().add("implementation", project.files(client));
+			log.info("Adding universal at {} to project", bom.universal);
+			project.getDependencies().add("implementation", project.files(universal));
+			for(File lib : bom.libs) {
+				log.info("Adding lib at {} to project", lib);
+				project.getDependencies().add("implementation", project.files(lib));
+			}
 		}
 	}
 	

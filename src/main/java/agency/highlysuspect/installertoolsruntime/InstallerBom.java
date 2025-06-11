@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * an "installer bill of materials", just a listing of files created by the neoforge installer
+ * an "installer bill of materials", just a listing of files created by the neoforge installer.
  * if the bom exists, i assume it is up-to-date and i don't need to rerun the installer
  */
 public class InstallerBom {
@@ -31,7 +31,7 @@ public class InstallerBom {
 				case "svr" -> bom.server = f;
 				case "svx" -> bom.serverExtra = f;
 				case "uni" -> bom.universal = f;
-				case "lib", "dep" -> bom.libs.add(f);
+				case "lib" -> bom.libs.add(f);
 				case null, default -> {
 					//idgaf bro
 				}
@@ -52,7 +52,7 @@ public class InstallerBom {
 		a(bob, "svr", server);
 		a(bob, "svx", serverExtra);
 		a(bob, "uni", universal);
-		for(File dep : libs) a(bob, "lib", dep);
+		for(File lib : libs) a(bob, "lib", lib);
 		return bob.toString();
 	}
 	
