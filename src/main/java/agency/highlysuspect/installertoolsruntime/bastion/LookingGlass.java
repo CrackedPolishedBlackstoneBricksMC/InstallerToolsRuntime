@@ -3,6 +3,7 @@ package agency.highlysuspect.installertoolsruntime.bastion;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.BiConsumer;
 
 /**
  * The point-of-contact between the Gradle classloader and the installer classloader.
@@ -14,6 +15,8 @@ public class LookingGlass {
 	public File neoforgeInstaller;
 	public File librariesDir;
 	public File rootDir;
+	public BiConsumer<String, Object[]> lifecycle;
+	public BiConsumer<String, Object[]> info;
 	
 	//installer -> plugin
 	public File clientPatched, serverPatched, clientExtra, serverExtra, nfUniversal;
@@ -29,10 +32,13 @@ public class LookingGlass {
 		map.put("clientExtra", clientExtra);
 		map.put("serverExtra", serverExtra);
 		map.put("nfUniversal", nfUniversal);
+		map.put("lifecycle", lifecycle);
+		map.put("info", info);
 		
 		return map;
 	}
 	
+	@SuppressWarnings("unchecked")
 	public static LookingGlass fromMap(Map<String, Object> map) {
 		LookingGlass glass = new LookingGlass();
 		glass.neoforgeInstaller = (File) map.get("neoforgeInstaller");
@@ -43,6 +49,16 @@ public class LookingGlass {
 		glass.clientExtra = (File) map.get("clientExtra");
 		glass.serverExtra = (File) map.get("serverExtra");
 		glass.nfUniversal = (File) map.get("nfUniversal");
+		glass.lifecycle = (BiConsumer<String, Object[]>) map.get("lifecycle");
+		glass.info = (BiConsumer<String, Object[]>) map.get("info");
 		return glass;
+	}
+	
+	public void lifecycle(String s, Object... args) {
+		lifecycle.accept(s, args);
+	}
+	
+	public void info(String s, Object... args) {
+		info.accept(s, args);
 	}
 }

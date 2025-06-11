@@ -4,6 +4,7 @@ import net.minecraftforge.installer.DownloadUtils;
 import net.minecraftforge.installer.actions.PostProcessors;
 import net.minecraftforge.installer.actions.ProgressCallback;
 import net.minecraftforge.installer.json.Artifact;
+import net.minecraftforge.installer.json.Install;
 import net.minecraftforge.installer.json.InstallV1;
 import net.minecraftforge.installer.json.Util;
 import net.minecraftforge.installer.json.Version;
@@ -22,8 +23,7 @@ public class Bastion {
 	Class<?> actionClass;
 	
 	{
-		System.out.println("Bastion clinit");
-		System.out.println("I was loaded by " + this.getClass().getClassLoader());
+		System.out.println("Bastion clinit, I was loaded by " + this.getClass().getClassLoader());
 		try {
 			actionClass = Class.forName("net.minecraftforge.installer.actions.Action");
 		} catch (ClassNotFoundException e) {
@@ -31,122 +31,129 @@ public class Bastion {
 		}
 	}
 	
+	@SuppressWarnings("unused")
 	public Map<String, Object> hello(Map<String, Object> map) {
-		LookingGlass window = LookingGlass.fromMap(map);
+		LookingGlass glass = LookingGlass.fromMap(map);
+		glass.lifecycle("Hello from Bastion");
 		
-		System.out.println("Hello from Bastion");
-		System.out.println("I was loaded by: " + this.getClass().getClassLoader());
-		System.out.println("Action is: " + actionClass);
-		System.out.println("Action was loaded by: " + actionClass.getClassLoader());
-		System.out.println("Through the window, I see: " + window.neoforgeInstaller);
+		//ok we're on the classloader with the installer, start interacting with it
+		ProgressCallback monitor = new GradleLogProgressCallback(glass);
+		InstallV1 installManifest = getInstallManifest();
+		String mc = installManifest.getMinecraft();
+		monitor.message("Found install manifest for Minecraft " + mc + " and NeoForge " + installManifest.getVersion());
 		
-		InstallV1 installationManifest = Util.loadInstallProfile();
-		System.out.println("Found installation manifest for Minecraft " + installationManifest.getMinecraft() + " and NeoForge " + installationManifest.getVersion());
+		monitor.setCurrentStep("Finding vanilla manifest");
+		Version vanilla = getVanillaManifest(monitor, installManifest, glass.rootDir);
 		
-		String mc = installationManifest.getMinecraft();
-		ProgressCallback monitor = ProgressCallback.TO_STD_OUT;
-		
-		//find urls of client and server
-		System.out.println("Finding client and server urls");
-		
-		File versionJson = new File(window.rootDir, mc + ".json");
-		Version vanilla = Util.getVanillaVersion(monitor, mc, versionJson);
-		if(vanilla == null) {
-			throw new RuntimeException("Failed to get vanilla version manifest");
-		}
-		Version.Download client = vanilla.getDownload("client");
-		Version.Download server = vanilla.getDownload("server");
-		
-		//download client
-		File versionVanilla = new File(window.rootDir, mc);
-		File clientTarget = new File(versionVanilla, mc + ".jar");
-		
-		System.out.println("Downloading client to " + clientTarget);
-		if(!monitor.downloader(client.getUrl())
-			.sha(client.getSha1())
-			.localPath("minecraft/" + mc + "/client.jar")
-			.download(clientTarget)
-		) {
-			clientTarget.delete();
-			throw new RuntimeException("failed to download client (invalid checksum?)");
-		}
-		
-		//download server.
+		//find where to put the client and server - use the root dir as scratch space?
 		//this weird path-munging is used in the ServerInstall action. todo is it needed
-		Map<String, String> tokens = Map.of(
-			"ROOT", window.rootDir.getAbsolutePath(),
-			"MINECRAFT_VERSION", mc,
-			"LIBRARY_DIR", window.librariesDir.getAbsolutePath()
-		);
-		File serverTarget = new File(Util.replaceTokens(tokens, installationManifest.getServerJarPath()));
+//		File clientTarget = new File(versionVanilla, mc + ".jar");
+//		Map<String, String> tokens = Map.of(
+//			"ROOT", glass.rootDir.getAbsolutePath(),
+//			"MINECRAFT_VERSION", mc,
+//			"LIBRARY_DIR", glass.librariesDir.getAbsolutePath()
+//		);
+//		File serverTarget = new File(Util.replaceTokens(tokens, installManifest.getServerJarPath()));
+		File clientTarget = new File(glass.rootDir, mc + ".client.jar");
+		File serverTarget = new File(glass.rootDir, mc + ".server.jar");
 		
-		System.out.println("Downloading server to " + serverTarget);
-		if(!monitor.downloader(server.getUrl())
-			.sha(server.getSha1())
-			.localPath("minecraft/" + mc + "/server.jar")
-			.download(serverTarget)
-		) {
-			serverTarget.delete();
-			throw new RuntimeException("failed to download server (invalid checksum?)");
+		monitor.setCurrentStep("Downloading " + mc + " client to " + clientTarget);
+		download(monitor, installManifest, vanilla, true, clientTarget);
+		monitor.setCurrentStep("Downloading " + mc + " server to " + serverTarget);
+		download(monitor, installManifest, vanilla, false, serverTarget);
+		
+		//postprocessor creation
+		monitor.setCurrentStep("Creating postprocessors");
+		PostProcessors clientPostProcessors = new PostProcessors(installManifest, true, monitor);
+		PostProcessors serverPostProcessors = new PostProcessors(installManifest, false, monitor);
+		
+		//libs
+		monitor.setCurrentStep("Downloading libraries");
+		Set<Version.Library> resolvedLibraries = fetchLibraries(monitor, glass.librariesDir, vanilla, clientPostProcessors, serverPostProcessors);
+		
+		//running those processors
+		monitor.setCurrentStep("Running client processors");
+		clientPostProcessors.process(glass.librariesDir, clientTarget, glass.rootDir, glass.neoforgeInstaller);
+		monitor.setCurrentStep("Running server processors");
+		serverPostProcessors.process(glass.librariesDir, serverTarget, glass.rootDir, glass.neoforgeInstaller);
+		
+		monitor.setCurrentStep("Finishing up");
+		
+		//TODO: a more reliable way to find the patched jar? lol.
+		Map<String, String> clientData = getData(clientPostProcessors);
+		Map<String, String> serverData = getData(serverPostProcessors);
+		glass.clientPatched = new File(clientData.get("PATCHED"));
+		glass.serverPatched = new File(serverData.get("PATCHED"));
+		glass.clientExtra = new File(clientData.get("MC_EXTRA"));
+		glass.serverExtra = new File(serverData.get("MC_EXTRA"));
+		
+		//yeah this is grody
+		//i feel like parsing the JVM arguments provided by the installer is somehow a *less* bad idea
+		//(later) no it's not, there's just a bunch of wrapper jars
+		for(Version.Library lib : resolvedLibraries) {
+			Artifact artifact = lib.getName();
+			if("net.neoforged".equals(artifact.getDomain()) && "universal".equals(getClassifier(artifact))) {
+				glass.nfUniversal = lib.getName().getLocalPath(glass.librariesDir);
+			}
 		}
 		
-		//create postprocessors
-		System.out.println("Creating postprocessors");
-		PostProcessors clientPostProcessors = new PostProcessors(installationManifest, true, monitor);
-		PostProcessors serverPostProcessors = new PostProcessors(installationManifest, false, monitor);
+		return glass.toMap();
+	}
+	
+	public InstallV1 getInstallManifest() {
+		try {
+			return Util.loadInstallProfile();
+		} catch (Exception e) {
+			throw new RuntimeException("Failed to load install manifest from the installer", e);
+		}
+	}
+	
+	public Version getVanillaManifest(ProgressCallback monitor, Install installManifest, File rootDir) {
+		String mc = installManifest.getMinecraft();
+		File versionJson = new File(rootDir, mc + ".json");
+		Version vanilla = Util.getVanillaVersion(monitor, mc, versionJson);
+		if(vanilla == null) throw new RuntimeException("Failed to get vanilla version manifest");
+		return vanilla;
+	}
+	
+	public void download(ProgressCallback monitor, Install installManifest, Version vanilla, boolean client, File target) {
+		String cs = client ? "client" : "server";
+		Version.Download dl = vanilla.getDownload(cs);
+		//local path is used by installer fatjars to pull from the fatjar instead of making a download
+		String localPath = "minecraft/" + installManifest.getVersion() + "/" + cs + ".jar";
 		
-		//fetch all the required libraries
-		System.out.println("Fetching libraries");
+		if(!monitor.downloader(dl.getUrl()).sha(dl.getSha1()).localPath(localPath).download(target)) {
+			//todo, boy error reporting here needs to be better
+			target.delete();
+			throw new RuntimeException("failed to download " + cs + " (invalid checksum?)");
+		}
+	}
+	
+	public Set<Version.Library> fetchLibraries(ProgressCallback monitor, File librariesDir, Version vanilla, PostProcessors clientPostProcessors, PostProcessors serverPostProcessors) {
 		//see Action#downloadLibraries
 		Set<Version.Library> libraries = new LinkedHashSet<>();
 		libraries.addAll(Arrays.asList(vanilla.getLibraries()));
 		libraries.addAll(Arrays.asList(clientPostProcessors.getLibraries()));
 		libraries.addAll(Arrays.asList(serverPostProcessors.getLibraries()));
+		
+		//args for the downloader
 		List<Artifact> grabbed = new ArrayList<>();
-		List<File> additionalLibDirs = List.of(window.librariesDir);
+		List<File> additionalLibDirs = List.of(librariesDir);
 		
 		for(Version.Library lib : libraries) {
-			File resolved = lib.getName().getLocalPath(window.librariesDir);
+			File resolved = lib.getName().getLocalPath(librariesDir);
 			if(resolved.exists()) {
-				System.out.println("Already downloaded " + lib.getName());
+				monitor.message("Already downloaded library " + lib.getName());
 			} else {
-				System.out.println("Downloading " + lib.getName());
-				DownloadUtils.downloadLibrary(monitor, lib, window.librariesDir, s -> true, grabbed, additionalLibDirs);
+				//monitor.setCurrentStep("Downloading library " + lib.getName()); //DownloadUtils already loads something like this
+				DownloadUtils.downloadLibrary(monitor, lib, librariesDir, s -> true, grabbed, additionalLibDirs);
 			}
 		}
 		
-		//TODO: processors run even if the file already exists, since they weren't intended to be used by gradle like this
-		// but afaik there isn't a reliable way to find the PATCHED path before calling .process, since .process
-		// is what actually performs the variable substitutions. One way to fix this would be simply putting caching somewhere
-		// else... like, simply copy the output into the project dir, and only run the installer if that output doesn't exist.
-		// Which is probably something i should do anyway. The other approach (what forgewrapper does) is simply to copy the
-		// code related to variable substitution
-		
-		System.out.println("Running client processors");
-		clientPostProcessors.process(window.librariesDir, clientTarget, window.rootDir, window.neoforgeInstaller);
-		System.out.println("Running server processors");
-		serverPostProcessors.process(window.librariesDir, serverTarget, window.rootDir, window.neoforgeInstaller);
-		
-		//TODO: a more reliable way to find the patched jar? lol.
-		Map<String, String> clientData = getData(clientPostProcessors);
-		Map<String, String> serverData = getData(serverPostProcessors);
-		window.clientPatched = new File(clientData.get("PATCHED"));
-		window.serverPatched = new File(serverData.get("PATCHED"));
-		window.clientExtra = new File(clientData.get("MC_EXTRA"));
-		window.serverExtra = new File(serverData.get("MC_EXTRA"));
-		
-		//yeah this is grody
-		//i feel like parsing the JVM arguments provided by the installer is somehow a *less* bad idea
-		for(Version.Library lib : libraries) {
-			Artifact artifact = lib.getName();
-			if("net.neoforged".equals(artifact.getDomain()) && "universal".equals(getClassifier(artifact))) {
-				window.nfUniversal = lib.getName().getLocalPath(window.librariesDir);
-			}
-		}
-		
-		return window.toMap();
+		return libraries;
 	}
 	
+	//we have access wideners at home
 	@SuppressWarnings("unchecked")
 	public Map<String, String> getData(PostProcessors pp) {
 		try {

@@ -49,11 +49,13 @@ public class ToyProject implements AutoCloseable {
 	}
 	
 	private String slug() {
-		return UUID.randomUUID().toString().substring(16);
+		return UUID.randomUUID().toString().replace("-", "").substring(16);
 	}
 	
 	@Override
 	public void close() throws Exception {
+		if(true) return; //No actually I want to look at the files
+		
 		Files.walkFileTree(projectDir, new SimpleFileVisitor<>() {
 			@Override
 			public FileVisitResult visitFile(@NotNull Path file, BasicFileAttributes attrs) throws IOException {
